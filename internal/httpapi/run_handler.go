@@ -52,7 +52,7 @@ func (h Handlers) runAgent(c *fiber.Ctx) error {
 		"search": agent.RAGNotesSearchTool,
 	}
 
-	evaluator := agent.DefaultEvaluator{}
+	evaluator := agent.GroundingEvaluator{}
 
 	engine := agent.NewEngine(pl, tools, evaluator)
 
