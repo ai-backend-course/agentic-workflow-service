@@ -56,6 +56,10 @@ func (e *Engine) Run(ctx context.Context, state map[string]any) (map[string]any,
 			}
 			state[step.Tool] = out
 
+			if step.Tool == "search" {
+				state["content"] = buildSummaryContentFromAny(out["results"])
+			}
+
 		case StepEvaluate:
 			score, pass := e.Eval.Evaluate(state)
 			state["evaluation_score"] = score

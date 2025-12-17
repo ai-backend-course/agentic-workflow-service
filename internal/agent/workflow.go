@@ -18,6 +18,7 @@ type Step struct {
 var Workflow = []Step{
 	{Type: StepLLM, Prompt: "intent_decider"},
 	{Type: StepTool, Tool: "search"},
-	{Type: StepEvaluate},
+	{Type: StepTool, Tool: "summarize"},
 	{Type: StepLLM, Prompt: "final_answer"},
+	{Type: StepEvaluate},
 }

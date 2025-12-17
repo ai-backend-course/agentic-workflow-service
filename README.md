@@ -2,16 +2,17 @@
 
 ## Overview
 
-The **Agentic Workflow Service** is a lightweight Go-based backend that demonstrates how to build an **agentic AI system** capable of:
+The **Agentic Workflow Service** is a production-deployed, Go-based backend that demonstrates how to build an **agentic AI system** capable of:
 
 * Understanding user intent
-* Invoking tools (semantic search, summarization)
+* Orchestrating multiple AI tools
+* Coordinating retrieval and summarization microservices
 * Evaluating results for grounding
 * Producing structured, traceable outputs
 
-This service acts as an **orchestration layer**, coordinating multiple AI microservices rather than embedding all logic in a single endpoint.
+This service acts as an **agent orchestration layer**, coordinating multiple internal AI microservices rather than embedding all AI logic in a single endpoint.
 
-It is designed to reflect how **production AI backends** are built: modular, observable, and explainable.
+It is designed to reflect how **real production AI backends** are built: modular, observable, explainable, and incrementally extensible.
 
 ---
 
@@ -20,20 +21,20 @@ It is designed to reflect how **production AI backends** are built: modular, obs
 Many AI backends either:
 
 * Call an LLM directly with no structure, or
-* Hard-code a single RAG flow without reasoning or validation
+* Hard-code a single RAG flow without reasoning, validation, or orchestration
 
-This service demonstrates a **balanced, production-minded approach**:
+This service demonstrates a **production-minded agentic approach** that is:
 
 * Simple enough to understand end-to-end
 * Structured enough to support real-world AI workflows
 
-It specifically showcases:
+Specifically, it showcases:
 
-* Agent workflows
-* Tool calling
-* Evaluation / grounding checks
+* Explicit agent workflows
+* Tool orchestration across services
+* Grounding and evaluation checks
 * Request-level tracing
-* Service orchestration
+* Service-to-service AI architecture
 
 ---
 
@@ -46,9 +47,10 @@ Client
   v
 Agentic Workflow Service
   |
-  |-- LLM (intent + final answer)
+  |-- LLM (intent detection)
   |-- Tool: Semantic Search (RAG Notes API)
-  |-- Tool: Summarization (Summary Service)
+  |-- Tool: Summarization (AI Summary Service)
+  |-- LLM (final answer synthesis)
   |-- Evaluation (grounding check)
 ```
 
@@ -58,21 +60,24 @@ Each request is treated as an **agent run**, with its own execution context and 
 
 ## Agent Execution Flow
 
-Each `/run` request follows a deterministic workflow:
+Each `/run` request follows a deterministic, inspectable workflow:
 
 1. **Intent Detection (LLM)**
    Determines what the user is trying to do and extracts entities (e.g. topic).
 
-2. **Tool Invocation**
-   Tools are executed according to the workflow definition (e.g. semantic search against stored notes).
+2. **Retrieval (Semantic Search Tool)**
+   Executes semantic search against an external RAG Notes API to retrieve relevant information.
 
-3. **Evaluation**
-   The agent checks whether retrieved information supports a grounded response, helping prevent hallucinations.
+3. **Summarization (Summary Tool)**
+   Passes retrieved context to a dedicated AI Summary microservice to condense and normalize information before reasoning.
 
-4. **Final Response (LLM)**
-   Generates a structured answer using retrieved evidence as context.
+4. **Final Answer Synthesis (LLM)**
+   Generates a grounded, structured response using summarized and retrieved context.
 
-The workflow is explicit and readable to keep reasoning and debugging straightforward.
+5. **Evaluation**
+   Scores the output for grounding and observability.
+
+The workflow is explicit and readable to keep reasoning, debugging, and extension straightforward.
 
 ---
 
@@ -84,8 +89,9 @@ The agent workflow is defined as an ordered sequence of steps:
 var Workflow = []Step{
     {Type: StepLLM, Prompt: "intent_decider"},
     {Type: StepTool, Tool: "search"},
-    {Type: StepEvaluate},
+    {Type: StepTool, Tool: "summarize"},
     {Type: StepLLM, Prompt: "final_answer"},
+    {Type: StepEvaluate},
 }
 ```
 
@@ -93,15 +99,15 @@ This design makes the agent:
 
 * Deterministic
 * Inspectable
-* Easy to extend (additional tools, retries, or branching)
+* Easy to extend (additional tools, retries, or conditional logic)
 
 ---
 
 ## Tools
 
-### Semantic Search Tool (RAG)
+### Semantic Search Tool (RAG Notes API)
 
-The agent integrates with an external **RAG Notes API** that performs:
+The agent integrates with an external **RAG Notes API** that provides:
 
 * Embedding-based semantic search
 * Top-K retrieval of relevant notes
@@ -111,13 +117,25 @@ Instead, it retrieves candidate information semantically and reasons over the re
 
 ---
 
+### Summarization Tool (AI Summary Service)
+
+Retrieved context is passed to a dedicated **AI Summary microservice**, which:
+
+* Condenses multiple retrieved documents
+* Normalizes noisy or overlapping information
+* Produces a focused summary for downstream reasoning
+
+This keeps the agent lightweight and avoids coupling summarization logic directly into the orchestration layer.
+
+---
+
 ## Evaluation & Grounding
 
-Before producing a final answer, the agent runs an evaluation step that:
+Before producing a final response, the agent runs an evaluation step that:
 
-* Inspects retrieved search results
-* Checks whether the final answer is grounded in retrieved evidence
-* Produces an evaluation score
+* Inspects retrieved and summarized context
+* Scores how well the final answer is grounded in evidence
+* Emits an evaluation score for observability
 
 This reflects a production mindset where **LLM outputs are treated as unreliable by default** and must be validated.
 
@@ -138,12 +156,12 @@ Example log output:
 ```
 [agent] run=8e29f3fb... step_type=llm step=intent_decider
 [agent] run=8e29f3fb... step_type=tool step=search
-[agent] run=8e29f3fb... step_type=evaluate
-[agent] run=8e29f3fb... evaluation_score=1.00 pass=true
+[agent] run=8e29f3fb... step_type=tool step=summarize
 [agent] run=8e29f3fb... step_type=llm step=final_answer
+[agent] run=8e29f3fb... evaluation_score=0.60 pass=true
 ```
 
-This allows each response to be traced and debugged deterministically.
+This allows each request to be traced and debugged deterministically.
 
 ---
 
@@ -170,7 +188,8 @@ Runs the agent workflow for a single input.
   "result": {
     "intent_decider": { ... },
     "search": { ... },
-    "evaluation_score": 1,
+    "summarize": { ... },
+    "evaluation_score": 0.6,
     "final_answer": { ... }
   }
 }
@@ -181,22 +200,14 @@ Runs the agent workflow for a single input.
 ## What This Project Demonstrates
 
 * Agentic AI workflows
-* Tool orchestration
-* RAG integration
-* Grounding & evaluation
+* Tool orchestration across microservices
+* RAG-based retrieval
+* Summarization as a first-class tool
+* Grounding and evaluation
 * Lightweight observability
-* Clean Go backend design
+* Clean, production-oriented Go backend design
 
-This service is intentionally focused and composable, designed to integrate with other AI microservices rather than replace them.
-
----
-
-## Planned Extensions
-
-* Centralized Generative AI service for LLM execution
-* Retry logic based on evaluation results
-* Additional tools (summarization, external APIs)
-* Expanded tracing and metrics
+This service is intentionally focused and composable, designed to **orchestrate AI capabilities**, not replace them.
 
 ---
 
@@ -204,6 +215,8 @@ This service is intentionally focused and composable, designed to integrate with
 
 * Go
 * Fiber
+* Docker
+* Fly.io
 * OpenAI API
 * External RAG & Summarization services
 * JSON-based agent state
@@ -213,4 +226,4 @@ This service is intentionally focused and composable, designed to integrate with
 ## Final Note
 
 This project prioritizes **clarity, correctness, and explainability** over complexity.
-It reflects how real AI backend systems evolve incrementally in production environments.
+It reflects how real AI backend systems evol

@@ -7,6 +7,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/joho/godotenv"
 
+	"agentic-workflow-service/internal/agent"
 	"agentic-workflow-service/internal/httpapi"
 )
 
@@ -18,6 +19,13 @@ func main() {
 	if port == "" {
 		port = "8080"
 	}
+
+	// Initialize LLM
+	apiKey := os.Getenv("OPENAI_API_KEY")
+	if apiKey == "" {
+		log.Fatal("missing OPENAI_API_KEY")
+	}
+	agent.InitLLM((apiKey))
 
 	// Create fiber app
 	app := fiber.New()

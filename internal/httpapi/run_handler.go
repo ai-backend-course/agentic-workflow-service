@@ -3,7 +3,6 @@ package httpapi
 import (
 	"agentic-workflow-service/internal/agent"
 	"context"
-	"os"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -38,19 +37,8 @@ func (h Handlers) runAgent(c *fiber.Ctx) error {
 		})
 	}
 
-	// Initialize LLM
-	apiKey := os.Getenv("OPENAI_API_KEY")
-	if apiKey == "" {
-		return c.Status(500).JSON(fiber.Map{
-			"error": "missing OPENAI_API_KEY",
-		})
-	}
-	agent.InitLLM((apiKey))
-
 	// Tools
-	tools := agent.ToolRegistry{
-		"search": agent.RAGNotesSearchTool,
-	}
+	tools := agent.DefaultToolRegistry()
 
 	evaluator := agent.GroundingEvaluator{}
 
